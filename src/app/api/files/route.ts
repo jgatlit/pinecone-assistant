@@ -55,3 +55,7 @@ export async function GET() {
     }, { status: 500 });
   }
 }
+// Export the config for the Edge runtime at the bottom:
+export const config = {
+  runtime: 'edge',
+};
