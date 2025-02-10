@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { checkAssistantPrerequisites } from '../../utils/assistantUtils';
-
+export const runtime = 'edge';
 export async function GET() {
   const { apiKey, assistantName } = await checkAssistantPrerequisites();
   
@@ -55,7 +55,3 @@ export async function GET() {
     }, { status: 500 });
   }
 }
-// Export the config for the Edge runtime at the bottom:
-export const config = {
-  runtime: 'edge',
-};
