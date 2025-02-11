@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { checkAssistantPrerequisites } from '../../utils/assistantUtils';
-export const runtime = 'edge';
+
 export const maxDuration = 55; 
 export async function GET() {
   const { apiKey, assistantName } = await checkAssistantPrerequisites();
-  
+   
   if (!apiKey || !assistantName) {
     return NextResponse.json({
       status: "error",
