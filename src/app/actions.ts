@@ -41,8 +41,10 @@ export type ChatMessage = {
  */
 export type Reference = {
   name: string;
-  url: string | undefined;
-  relevance: string;
+  url?: string | undefined;
+  documentId?: string;
+  relevance?: string;
+  error?: string;
 };
 
 /**
