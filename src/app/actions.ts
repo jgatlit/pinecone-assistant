@@ -15,7 +15,7 @@ import { performRAGSearch, generateCitationUrls } from '@/lib/rag';
 import { traceable } from 'langsmith/traceable';
 import { wrapOpenAI } from 'langsmith/wrappers';
 import type { Citation } from '@/lib/types';
-import { createAuthenticatedSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 /**
  * Message type for chat interface
@@ -122,24 +122,17 @@ const tracedGenerateEmbedding = traceable(
  */
 export async function getOrCreateSession(): Promise<string | null> {
   try {
-    const supabase = await createAuthenticatedSupabaseClient();
+    const supabase = await createAdminSupabaseClient();
 
-    // Get current authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.error('Authentication error:', authError);
-      return null;
-    }
+    // For now, use a fixed user ID (temporary until auth is implemented)
+    // TODO: Replace with actual user authentication
+    const DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
 
     // Check for existing active session (most recent)
     const { data: existingSessions, error: fetchError } = await supabase
       .from('sbwc_chat_sessions')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', DEFAULT_USER_ID)
       .order('updated_at', { ascending: false })
       .limit(1);
 
@@ -157,7 +150,7 @@ export async function getOrCreateSession(): Promise<string | null> {
     const { data: newSession, error: createError } = await supabase
       .from('sbwc_chat_sessions')
       .insert({
-        user_id: user.id,
+        user_id: DEFAULT_USER_ID,
         title: 'New Chat',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -210,7 +203,7 @@ export async function getOrCreateSession(): Promise<string | null> {
  */
 export async function loadMessageHistory(sessionId: string): Promise<ChatMessage[]> {
   try {
-    const supabase = await createAuthenticatedSupabaseClient();
+    const supabase = await createAdminSupabaseClient();
 
     // Fetch messages for the session
     const { data: messages, error } = await supabase
@@ -276,7 +269,7 @@ export async function saveMessage(
   references?: Reference[]
 ): Promise<boolean> {
   try {
-    const supabase = await createAuthenticatedSupabaseClient();
+    const supabase = await createAdminSupabaseClient();
 
     // Save message to database
     const { error: messageError } = await supabase.from('sbwc_chat_messages').insert({

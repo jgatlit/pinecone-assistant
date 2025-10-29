@@ -77,11 +77,18 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
         setLoadingHistory(true);
 
         // Get or create session
-        const session = await getOrCreateSession();
-        setSessionId(session.id);
+        const sessionId = await getOrCreateSession();
+
+        if (!sessionId) {
+          setError('Failed to create chat session. Please ensure you are logged in.');
+          setLoadingHistory(false);
+          return;
+        }
+
+        setSessionId(sessionId);
 
         // Load message history for this session
-        const history = await loadMessageHistory(session.id);
+        const history = await loadMessageHistory(sessionId);
         setMessages(history);
 
       } catch (error) {
@@ -148,7 +155,7 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
     setIsStreaming(true);
 
     // Save user message to database (non-blocking)
-    saveMessage(sessionId, newUserMessage).catch(error => {
+    saveMessage(sessionId, 'user', newUserMessage.content).catch(error => {
       console.error('Failed to save user message:', error);
       // Don't block chat on save failure
     });
@@ -198,13 +205,7 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
       });
 
       // Save assistant message with references (non-blocking)
-      const finalAssistantMessage: Message = {
-        ...newAssistantMessage,
-        content: accumulatedContent,
-        references: references
-      };
-
-      saveMessage(sessionId, finalAssistantMessage).catch(error => {
+      saveMessage(sessionId, 'assistant', accumulatedContent, references).catch(error => {
         console.error('Failed to save assistant message:', error);
         // Don't block chat on save failure
       });
