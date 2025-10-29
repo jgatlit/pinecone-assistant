@@ -1,87 +1,53 @@
-/**
- * Health check endpoint
- * Verifies system status and database connectivity
- */
-
 import { NextResponse } from 'next/server';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
-/**
- * GET /api/health
- *
- * Performs health check:
- * - Verifies Supabase connection
- * - Returns system status
- *
- * No authentication required - public endpoint
- *
- * @returns Health status with database connectivity info
- *
- * @example Response (200 OK):
- * ```json
- * {
- *   "status": "healthy",
- *   "timestamp": "2024-01-15T10:30:00.000Z",
- *   "database": "connected",
- *   "version": "1.0.0"
- * }
- * ```
- *
- * @example Response (500 Error):
- * ```json
- * {
- *   "status": "unhealthy",
- *   "timestamp": "2024-01-15T10:30:00.000Z",
- *   "database": "disconnected",
- *   "error": "Connection failed"
- * }
- * ```
- */
 export async function GET() {
-  const timestamp = new Date().toISOString();
+  const checks = {
+    timestamp: new Date().toISOString(),
+    environment: {
+      supabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      supabaseServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      openaiKey: !!process.env.OPENAI_API_KEY,
+    },
+    database: {
+      connected: false,
+      sessionsTable: false,
+      messagesTable: false,
+      error: null as string | null,
+    },
+  };
 
   try {
-    // Test database connectivity with simple query
     const supabase = await createAdminSupabaseClient();
 
-    const { error } = await supabase
-      .from('sbwc_documents')
+    // Test connection with a simple query
+    const { data: sessions, error: sessionsError } = await supabase
+      .from('sbwc_chat_sessions')
       .select('id')
       .limit(1);
 
-    if (error) {
-      console.error('Health check database error:', error);
-      return NextResponse.json(
-        {
-          status: 'unhealthy',
-          timestamp,
-          database: 'disconnected',
-          error: error.message,
-        },
-        { status: 500 }
-      );
+    if (sessionsError) {
+      checks.database.error = sessionsError.message;
+    } else {
+      checks.database.connected = true;
+      checks.database.sessionsTable = true;
     }
 
-    return NextResponse.json(
-      {
-        status: 'healthy',
-        timestamp,
-        database: 'connected',
-        version: '1.0.0',
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error('Health check error:', error);
+    // Check messages table
+    const { error: messagesError } = await supabase
+      .from('sbwc_chat_messages')
+      .select('id')
+      .limit(1);
 
-    return NextResponse.json(
-      {
-        status: 'unhealthy',
-        timestamp,
-        database: 'disconnected',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
+    if (!messagesError) {
+      checks.database.messagesTable = true;
+    }
+
+  } catch (error) {
+    checks.database.error = error instanceof Error ? error.message : String(error);
   }
+
+  return NextResponse.json(checks, { 
+    status: checks.database.connected ? 200 : 500 
+  });
 }
