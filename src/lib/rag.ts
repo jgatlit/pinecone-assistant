@@ -48,7 +48,7 @@ export async function searchDocuments(
   try {
     const supabase = await createAdminSupabaseClient();
 
-    const { data, error } = await supabase.rpc('match_sbwc_document_sections', {
+    const { data, error } = await (supabase.rpc as any)('match_sbwc_document_sections', {
       query_embedding: queryEmbedding,
       match_threshold: config.matchThreshold,
       match_count: config.matchCount,
