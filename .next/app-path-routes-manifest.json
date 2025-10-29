@@ -7,7 +7,7 @@
   "/api/files/route": "/api/files",
   "/api/documents/route": "/api/documents",
   "/sign-in/[[...sign-in]]/page": "/sign-in/[[...sign-in]]",
-  "/page": "/",
   "/sign-up/[[...sign-up]]/page": "/sign-up/[[...sign-up]]",
+  "/page": "/",
   "/documents/page": "/documents"
 }

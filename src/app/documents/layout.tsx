@@ -6,7 +6,7 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Documents | SBWC ChatBot',
+  title: 'GA Workers Comp | documents',
   description: 'Manage your document library for the SBWC ChatBot assistant',
 };
 

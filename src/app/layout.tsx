@@ -6,7 +6,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "SBWC Chatbot - Workers' Compensation Assistant",
+  title: "GA Workers Comp | research agent",
   description: "AI-powered assistant for State Board of Workers' Compensation queries",
 };
 
@@ -21,7 +21,7 @@ export default function RootLayout({
         <body className={inter.className}>
           <header className="fixed top-0 right-0 z-50 p-4">
             <SignedIn>
-              <UserButton afterSignOutUrl="/sign-in" />
+              <UserButton />
             </SignedIn>
           </header>
           {children}
