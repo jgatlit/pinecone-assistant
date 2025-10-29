@@ -15,7 +15,7 @@ import { performRAGSearch, generateCitationUrls } from '@/lib/rag';
 import { traceable } from 'langsmith/traceable';
 import { wrapOpenAI } from 'langsmith/wrappers';
 import type { Citation } from '@/lib/types';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminSupabaseClient } from '@/lib/supabase/server';
 
 /**
  * Message type for chat interface
@@ -124,24 +124,14 @@ const tracedGenerateEmbedding = traceable(
  */
 export async function getOrCreateSession(): Promise<string | null> {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAdminSupabaseClient();
 
-    // Get current authenticated user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.error('Authentication error:', authError);
-      return null;
-    }
-
-    // Check for existing active session (most recent)
+    // Check for existing active session with NULL user_id (unauthenticated mode)
+    // Until Phase 2 authentication is implemented, all sessions use NULL user_id
     const { data: existingSessions, error: fetchError } = await supabase
       .from('sbwc_chat_sessions')
       .select('id')
-      .eq('user_id', user.id)
+      .is('user_id', null)
       .order('updated_at', { ascending: false })
       .limit(1);
 
@@ -155,15 +145,15 @@ export async function getOrCreateSession(): Promise<string | null> {
       return (existingSessions[0] as { id: string }).id;
     }
 
-    // Create new session
-    const { data: newSession, error: createError } = await supabase
+    // Create new session with NULL user_id (omit field to use NULL)
+    const { data: newSession, error: createError} = await supabase
       .from('sbwc_chat_sessions')
       .insert({
-        user_id: user.id,
         title: 'New Chat',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         metadata: {},
+        // user_id is omitted - will be NULL until Phase 2 authentication
       } as any)
       .select('id')
       .single();
@@ -212,7 +202,7 @@ export async function getOrCreateSession(): Promise<string | null> {
  */
 export async function loadMessageHistory(sessionId: string): Promise<ChatMessage[]> {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAdminSupabaseClient();
 
     // Fetch messages for the session
     const { data: messages, error } = await supabase
@@ -278,7 +268,7 @@ export async function saveMessage(
   references?: Reference[]
 ): Promise<boolean> {
   try {
-    const supabase = await createServerSupabaseClient();
+    const supabase = await createAdminSupabaseClient();
 
     // Save message to database
     const { error: messageError } = await supabase.from('sbwc_chat_messages').insert({
