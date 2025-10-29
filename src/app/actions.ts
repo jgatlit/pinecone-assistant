@@ -16,6 +16,7 @@ import { traceable } from 'langsmith/traceable';
 import { wrapOpenAI } from 'langsmith/wrappers';
 import type { Citation } from '@/lib/types';
 import { createAdminSupabaseClient } from '@/lib/supabase/server';
+import { auth } from '@clerk/nextjs/server';
 
 /**
  * Message type for chat interface
@@ -108,8 +109,8 @@ const tracedGenerateEmbedding = traceable(
 /**
  * Gets or creates a chat session for the current authenticated user
  *
- * Checks for an existing active session (most recent by updated_at) and returns it,
- * or creates a new session if none exists. Handles authentication gracefully.
+ * Uses Clerk authentication to get the current user ID and manages chat sessions
+ * per user. Each user has their own set of sessions.
  *
  * @returns Promise resolving to session ID or null if authentication fails
  *
@@ -124,14 +125,21 @@ const tracedGenerateEmbedding = traceable(
  */
 export async function getOrCreateSession(): Promise<string | null> {
   try {
+    // Get authenticated user from Clerk
+    const { userId, isAuthenticated } = await auth();
+
+    if (!isAuthenticated || !userId) {
+      console.error('User not authenticated');
+      return null;
+    }
+
     const supabase = await createAdminSupabaseClient();
 
-    // Check for existing active session with NULL user_id (unauthenticated mode)
-    // Until Phase 2 authentication is implemented, all sessions use NULL user_id
+    // Check for existing active session for this user (most recent)
     const { data: existingSessions, error: fetchError } = await supabase
       .from('sbwc_chat_sessions')
       .select('id')
-      .is('user_id', null)
+      .eq('user_id', userId)
       .order('updated_at', { ascending: false })
       .limit(1);
 
@@ -145,15 +153,15 @@ export async function getOrCreateSession(): Promise<string | null> {
       return (existingSessions[0] as { id: string }).id;
     }
 
-    // Create new session with NULL user_id (omit field to use NULL)
+    // Create new session for this user
     const { data: newSession, error: createError} = await supabase
       .from('sbwc_chat_sessions')
       .insert({
+        user_id: userId,
         title: 'New Chat',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         metadata: {},
-        // user_id is omitted - will be NULL until Phase 2 authentication
       } as any)
       .select('id')
       .single();

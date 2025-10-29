@@ -2,10 +2,12 @@
   "/_not-found/page": "app/_not-found/page.js",
   "/api/assistants/route": "app/api/assistants/route.js",
   "/api/health/route": "app/api/health/route.js",
-  "/page": "app/page.js",
   "/favicon.ico/route": "app/favicon.ico/route.js",
   "/api/embed/route": "app/api/embed/route.js",
   "/api/files/route": "app/api/files/route.js",
   "/api/documents/route": "app/api/documents/route.js",
+  "/sign-in/[[...sign-in]]/page": "app/sign-in/[[...sign-in]]/page.js",
+  "/page": "app/page.js",
+  "/sign-up/[[...sign-up]]/page": "app/sign-up/[[...sign-up]]/page.js",
   "/documents/page": "app/documents/page.js"
 }

@@ -1,1 +1,13 @@
-{"/_not-found/page":"/_not-found","/api/assistants/route":"/api/assistants","/api/health/route":"/api/health","/page":"/","/favicon.ico/route":"/favicon.ico","/api/embed/route":"/api/embed","/api/files/route":"/api/files","/api/documents/route":"/api/documents","/documents/page":"/documents"}
+{
+  "/_not-found/page": "/_not-found",
+  "/api/assistants/route": "/api/assistants",
+  "/api/health/route": "/api/health",
+  "/favicon.ico/route": "/favicon.ico",
+  "/api/embed/route": "/api/embed",
+  "/api/files/route": "/api/files",
+  "/api/documents/route": "/api/documents",
+  "/sign-in/[[...sign-in]]/page": "/sign-in/[[...sign-in]]",
+  "/page": "/",
+  "/sign-up/[[...sign-up]]/page": "/sign-up/[[...sign-up]]",
+  "/documents/page": "/documents"
+}
