@@ -7,9 +7,9 @@ import { openai } from '@ai-sdk/openai';
 import { embed } from 'ai';
 
 /**
- * Generates an embedding vector for the given text using OpenAI's text-embedding-3-small model
+ * Generates an embedding vector for the given text using OpenAI's text-embedding-3-large model
  *
- * Uses OpenAI's embedding model to convert text into a 384-dimensional vector
+ * Uses OpenAI's embedding model to convert text into a 1536-dimensional vector
  * for semantic search and similarity matching.
  *
  * @param text - The input text to generate an embedding for
@@ -19,7 +19,7 @@ import { embed } from 'ai';
  * @example
  * ```typescript
  * const embedding = await generateEmbedding("What are the safety requirements?");
- * // Returns: [0.123, -0.456, 0.789, ...]  (384 dimensions)
+ * // Returns: [0.123, -0.456, 0.789, ...]  (1536 dimensions)
  * ```
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
@@ -29,7 +29,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     }
 
     const { embedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
+      model: openai.embedding('text-embedding-3-large'),
       value: text,
     });
 
