@@ -106,7 +106,7 @@ export async function processDocument(
         name: file.name,
         storage_path: storagePath,
         sections_count: 0,
-        uploaded_at: document.created_at,
+        uploaded_at: (document as any).created_at,
         processing_status: 'pending',
       };
     }
@@ -162,7 +162,7 @@ export async function processDocument(
 
     const { error: sectionsError } = await supabase
       .from('sbwc_document_sections')
-      .insert(sections);
+      .insert(sections as any);
 
     if (sectionsError) {
       await supabase.from('sbwc_documents').delete().eq('id', documentId);
@@ -175,7 +175,7 @@ export async function processDocument(
       name: file.name,
       storage_path: storagePath,
       sections_count: chunks.length,
-      uploaded_at: document.created_at,
+      uploaded_at: (document as any).created_at,
       processing_status: 'completed',
     };
   } catch (error) {
@@ -318,14 +318,15 @@ export async function deleteDocument(
     }
 
     // Verify user owns document (skip check if created_by is null or demo user)
-    if (document.created_by && document.created_by !== userId && userId !== '00000000-0000-0000-0000-000000000001') {
+    const doc = document as any;
+    if (doc.created_by && doc.created_by !== userId && userId !== '00000000-0000-0000-0000-000000000001') {
       throw new Error('Unauthorized: You do not own this document');
     }
 
     // Delete from storage
     const { error: storageError } = await supabase.storage
       .from('sbwc-documents')
-      .remove([document.storage_path]);
+      .remove([doc.storage_path]);
 
     if (storageError) {
       console.error('Storage deletion error:', storageError);

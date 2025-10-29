@@ -123,18 +123,14 @@ const tracedGenerateEmbedding = traceable(
  * ```
  */
 export async function getOrCreateSession(): Promise<string | null> {
-  console.log('[getOrCreateSession] Starting...');
   try {
-    console.log('[getOrCreateSession] Creating admin client...');
     const supabase = await createAdminSupabaseClient();
-    console.log('[getOrCreateSession] Admin client created successfully');
 
     // For now, use a fixed user ID (temporary until auth is implemented)
     // TODO: Replace with actual user authentication
     const DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
 
     // Check for existing active session (most recent)
-    console.log('[getOrCreateSession] Fetching existing sessions...');
     const { data: existingSessions, error: fetchError } = await supabase
       .from('sbwc_chat_sessions')
       .select('id')
@@ -143,20 +139,16 @@ export async function getOrCreateSession(): Promise<string | null> {
       .limit(1);
 
     if (fetchError) {
-      console.error('[getOrCreateSession] Error fetching sessions:', fetchError);
+      console.error('Error fetching sessions:', fetchError);
       // Fall through to create new session
-    } else {
-      console.log('[getOrCreateSession] Fetch successful. Found sessions:', existingSessions?.length || 0);
     }
 
     // Return existing session if found
     if (existingSessions && existingSessions.length > 0) {
-      console.log('[getOrCreateSession] Returning existing session:', existingSessions[0].id);
-      return existingSessions[0].id;
+      return (existingSessions[0] as { id: string }).id;
     }
 
     // Create new session
-    console.log('[getOrCreateSession] No existing session, creating new one...');
     const { data: newSession, error: createError } = await supabase
       .from('sbwc_chat_sessions')
       .insert({
@@ -165,19 +157,18 @@ export async function getOrCreateSession(): Promise<string | null> {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         metadata: {},
-      })
+      } as any)
       .select('id')
       .single();
 
     if (createError) {
-      console.error('[getOrCreateSession] Error creating session:', createError);
+      console.error('Error creating session:', createError);
       return null;
     }
 
-    console.log('[getOrCreateSession] Session created:', newSession?.id);
-    return newSession?.id || null;
+    return (newSession as { id: string } | null)?.id || null;
   } catch (error) {
-    console.error('[getOrCreateSession] Unexpected error:', error);
+    console.error('Unexpected error in getOrCreateSession:', error);
     return null;
   }
 }
@@ -233,7 +224,7 @@ export async function loadMessageHistory(sessionId: string): Promise<ChatMessage
     }
 
     // Transform database format to frontend format
-    return messages.map((msg) => ({
+    return messages.map((msg: any) => ({
       id: msg.id,
       role: msg.role as 'user' | 'assistant',
       content: msg.content,
@@ -291,7 +282,7 @@ export async function saveMessage(
       model: role === 'assistant' ? 'gpt-4o' : null,
       created_at: new Date().toISOString(),
       metadata: references ? { references } : {},
-    });
+    } as any);
 
     if (messageError) {
       console.error('Error saving message:', messageError);
@@ -299,9 +290,9 @@ export async function saveMessage(
     }
 
     // Update session's updated_at timestamp
-    const { error: sessionError } = await supabase
+    const { error: sessionError } = await (supabase
       .from('sbwc_chat_sessions')
-      .update({ updated_at: new Date().toISOString() })
+      .update as any)({ updated_at: new Date().toISOString() })
       .eq('id', sessionId);
 
     if (sessionError) {
