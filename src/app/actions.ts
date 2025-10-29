@@ -123,14 +123,18 @@ const tracedGenerateEmbedding = traceable(
  * ```
  */
 export async function getOrCreateSession(): Promise<string | null> {
+  console.log('[getOrCreateSession] Starting...');
   try {
+    console.log('[getOrCreateSession] Creating admin client...');
     const supabase = await createAdminSupabaseClient();
+    console.log('[getOrCreateSession] Admin client created successfully');
 
     // For now, use a fixed user ID (temporary until auth is implemented)
     // TODO: Replace with actual user authentication
     const DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
 
     // Check for existing active session (most recent)
+    console.log('[getOrCreateSession] Fetching existing sessions...');
     const { data: existingSessions, error: fetchError } = await supabase
       .from('sbwc_chat_sessions')
       .select('id')
@@ -139,16 +143,20 @@ export async function getOrCreateSession(): Promise<string | null> {
       .limit(1);
 
     if (fetchError) {
-      console.error('Error fetching sessions:', fetchError);
+      console.error('[getOrCreateSession] Error fetching sessions:', fetchError);
       // Fall through to create new session
+    } else {
+      console.log('[getOrCreateSession] Fetch successful. Found sessions:', existingSessions?.length || 0);
     }
 
     // Return existing session if found
     if (existingSessions && existingSessions.length > 0) {
+      console.log('[getOrCreateSession] Returning existing session:', existingSessions[0].id);
       return existingSessions[0].id;
     }
 
     // Create new session
+    console.log('[getOrCreateSession] No existing session, creating new one...');
     const { data: newSession, error: createError } = await supabase
       .from('sbwc_chat_sessions')
       .insert({
@@ -162,13 +170,14 @@ export async function getOrCreateSession(): Promise<string | null> {
       .single();
 
     if (createError) {
-      console.error('Error creating session:', createError);
+      console.error('[getOrCreateSession] Error creating session:', createError);
       return null;
     }
 
+    console.log('[getOrCreateSession] Session created:', newSession?.id);
     return newSession?.id || null;
   } catch (error) {
-    console.error('Unexpected error in getOrCreateSession:', error);
+    console.error('[getOrCreateSession] Unexpected error:', error);
     return null;
   }
 }
