@@ -161,7 +161,19 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
     });
 
     try {
-      const { object, citations } = await chat([newUserMessage]);
+      // Build conversation history with all previous messages for context
+      const conversationHistory = [
+        ...messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        {
+          role: 'user' as const,
+          content: newUserMessage.content
+        }
+      ];
+
+      const { object, citations } = await chat(conversationHistory);
       let accumulatedContent = '';
       const newAssistantMessage: Message = {
         id: uuidv4(),
@@ -270,7 +282,7 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
                     </div>
                   </div>
                 ) : (
-                {messages.map((message, index) => (
+                  messages.map((message, index) => (
                   <div key={index} className={`mb-2 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`flex items-start ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                       <div className={`${message.role === 'user' ? 'ml-2' : 'mr-2'}`}>
@@ -341,9 +353,9 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
                       </span>
                     </div>
                   </div>
-                ))}
-                <div ref={messagesEndRef} />
+                  ))
                 )}
+                <div ref={messagesEndRef} />
               </div>
               <form onSubmit={(e) => { e.preventDefault(); handleChat(); }} className="flex mb-4">
                 <input
