@@ -4,6 +4,7 @@
  * Server actions for chat interface
  * Implements RAG-powered chat using Supabase vector search and OpenAI
  * Includes LangSmith tracing for monitoring and debugging
+ * Includes chat session and message history persistence
  */
 
 import { streamText } from 'ai';
@@ -14,6 +15,7 @@ import { performRAGSearch, generateCitationUrls } from '@/lib/rag';
 import { traceable } from 'langsmith/traceable';
 import { wrapOpenAI } from 'langsmith/wrappers';
 import type { Citation } from '@/lib/types';
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase/server';
 
 /**
  * Message type for chat interface
@@ -21,6 +23,26 @@ import type { Citation } from '@/lib/types';
 type Message = {
   role: 'system' | 'user' | 'assistant' | 'function' | 'data' | 'tool';
   content: string;
+};
+
+/**
+ * Extended message type with metadata for frontend
+ */
+export type ChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  references?: Reference[];
+};
+
+/**
+ * Reference type for document citations
+ */
+export type Reference = {
+  name: string;
+  url: string | undefined;
+  relevance: string;
 };
 
 /**
@@ -80,6 +102,215 @@ const tracedGenerateEmbedding = traceable(
   }
 );
 
+
+/**
+ * Gets or creates a chat session for the current authenticated user
+ *
+ * Checks for an existing active session (most recent by updated_at) and returns it,
+ * or creates a new session if none exists. Handles authentication gracefully.
+ *
+ * @returns Promise resolving to session ID or null if authentication fails
+ *
+ * @example
+ * ```typescript
+ * const sessionId = await getOrCreateSession();
+ * if (!sessionId) {
+ *   // Handle unauthenticated state
+ *   return;
+ * }
+ * ```
+ */
+export async function getOrCreateSession(): Promise<string | null> {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+
+    // Get current authenticated user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.error('Authentication error:', authError);
+      return null;
+    }
+
+    // Check for existing active session (most recent)
+    const { data: existingSessions, error: fetchError } = await supabase
+      .from('sbwc_chat_sessions')
+      .select('id')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+
+    if (fetchError) {
+      console.error('Error fetching sessions:', fetchError);
+      // Fall through to create new session
+    }
+
+    // Return existing session if found
+    if (existingSessions && existingSessions.length > 0) {
+      return existingSessions[0].id;
+    }
+
+    // Create new session
+    const { data: newSession, error: createError } = await supabase
+      .from('sbwc_chat_sessions')
+      .insert({
+        user_id: user.id,
+        title: 'New Chat',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        metadata: {},
+      })
+      .select('id')
+      .single();
+
+    if (createError) {
+      console.error('Error creating session:', createError);
+      return null;
+    }
+
+    return newSession?.id || null;
+  } catch (error) {
+    console.error('Unexpected error in getOrCreateSession:', error);
+    return null;
+  }
+}
+
+/**
+ * Loads message history for a specific chat session
+ *
+ * Fetches all messages for the given session ID, ordered chronologically.
+ * Transforms database format to frontend ChatMessage type including references.
+ * Returns empty array on error for graceful degradation.
+ *
+ * @param sessionId - The chat session ID to load messages for
+ * @returns Promise resolving to array of ChatMessage objects
+ *
+ * @example
+ * ```typescript
+ * const messages = await loadMessageHistory(sessionId);
+ * // Returns: [
+ * //   {
+ * //     id: "msg-123",
+ * //     role: "user",
+ * //     content: "What are safety requirements?",
+ * //     timestamp: "2024-01-15T10:30:00Z",
+ * //   },
+ * //   {
+ * //     id: "msg-124",
+ * //     role: "assistant",
+ * //     content: "Safety requirements include...",
+ * //     timestamp: "2024-01-15T10:30:05Z",
+ * //     references: [{ name: "safety-manual.pdf", url: "...", relevance: "85%" }]
+ * //   }
+ * // ]
+ * ```
+ */
+export async function loadMessageHistory(sessionId: string): Promise<ChatMessage[]> {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+
+    // Fetch messages for the session
+    const { data: messages, error } = await supabase
+      .from('sbwc_chat_messages')
+      .select('id, role, content, created_at, metadata')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error loading message history:', error);
+      return [];
+    }
+
+    if (!messages || messages.length === 0) {
+      return [];
+    }
+
+    // Transform database format to frontend format
+    return messages.map((msg) => ({
+      id: msg.id,
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content,
+      timestamp: msg.created_at,
+      references: msg.metadata?.references || undefined,
+    }));
+  } catch (error) {
+    console.error('Unexpected error loading message history:', error);
+    return [];
+  }
+}
+
+/**
+ * Saves a message to the database
+ *
+ * Persists user or assistant messages to sbwc_chat_messages table.
+ * Stores references array in metadata JSONB field for assistant messages.
+ * Updates the session's updated_at timestamp to reflect recent activity.
+ *
+ * @param sessionId - The chat session ID
+ * @param role - Message role ('user' or 'assistant')
+ * @param content - Message content text
+ * @param references - Optional array of document references for assistant messages
+ * @returns Promise resolving to success boolean
+ *
+ * @example
+ * ```typescript
+ * // Save user message
+ * await saveMessage(sessionId, 'user', 'What are safety requirements?');
+ *
+ * // Save assistant message with references
+ * await saveMessage(
+ *   sessionId,
+ *   'assistant',
+ *   'Safety requirements include...',
+ *   [{ name: 'safety-manual.pdf', url: '...', relevance: '85%' }]
+ * );
+ * ```
+ */
+export async function saveMessage(
+  sessionId: string,
+  role: 'user' | 'assistant',
+  content: string,
+  references?: Reference[]
+): Promise<boolean> {
+  try {
+    const supabase = await createAuthenticatedSupabaseClient();
+
+    // Save message to database
+    const { error: messageError } = await supabase.from('sbwc_chat_messages').insert({
+      session_id: sessionId,
+      role,
+      content,
+      tokens_used: null, // Can be populated later if tracking token usage
+      model: role === 'assistant' ? 'gpt-4o' : null,
+      created_at: new Date().toISOString(),
+      metadata: references ? { references } : {},
+    });
+
+    if (messageError) {
+      console.error('Error saving message:', messageError);
+      return false;
+    }
+
+    // Update session's updated_at timestamp
+    const { error: sessionError } = await supabase
+      .from('sbwc_chat_sessions')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', sessionId);
+
+    if (sessionError) {
+      console.error('Error updating session timestamp:', sessionError);
+      // Don't fail the operation if session update fails
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Unexpected error saving message:', error);
+    return false;
+  }
+}
 
 /**
  * chat - Server action for RAG-powered chat streaming

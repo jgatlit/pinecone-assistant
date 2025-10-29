@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent, useRef, useCallback } from 'react';
 import { readStreamableValue } from 'ai/rsc';
-import { chat } from './actions';
+import { chat, getOrCreateSession, loadMessageHistory, saveMessage } from './actions';
 import ReactMarkdown from 'react-markdown';
 import AssistantFiles from './components/AssistantFiles';
 import { File, Reference, Message } from './types';
@@ -27,6 +27,8 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
   const [isStreaming, setIsStreaming] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [darkMode, setDarkMode] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
     // Check for dark mode preference
@@ -68,6 +70,31 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
     fetchDocuments();
   }, []);
 
+  // Initialize session and load message history on mount
+  useEffect(() => {
+    const initializeSession = async () => {
+      try {
+        setLoadingHistory(true);
+
+        // Get or create session
+        const session = await getOrCreateSession();
+        setSessionId(session.id);
+
+        // Load message history for this session
+        const history = await loadMessageHistory(session.id);
+        setMessages(history);
+
+      } catch (error) {
+        console.error('Error initializing session:', error);
+        setError('Failed to load chat history');
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    initializeSession();
+  }, []);
+
   const fetchDocuments = async () => {
     try {
       const response = await fetch('/api/documents');
@@ -102,6 +129,13 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
   const handleChat = async () => {
     if (!input.trim()) return;
 
+    // Check sessionId exists before proceeding
+    if (!sessionId) {
+      console.error('No session ID available');
+      setError('Session not initialized. Please refresh the page.');
+      return;
+    }
+
     const newUserMessage: Message = {
       id: uuidv4(),
       role: 'user',
@@ -112,6 +146,12 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
     setMessages(prevMessages => [...prevMessages, newUserMessage]);
     setInput('');
     setIsStreaming(true);
+
+    // Save user message to database (non-blocking)
+    saveMessage(sessionId, newUserMessage).catch(error => {
+      console.error('Failed to save user message:', error);
+      // Don't block chat on save failure
+    });
 
     try {
       const { object, citations } = await chat([newUserMessage]);
@@ -155,6 +195,18 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
         const lastMessage = updatedMessages[updatedMessages.length - 1];
         lastMessage.references = references;
         return updatedMessages;
+      });
+
+      // Save assistant message with references (non-blocking)
+      const finalAssistantMessage: Message = {
+        ...newAssistantMessage,
+        content: accumulatedContent,
+        references: references
+      };
+
+      saveMessage(sessionId, finalAssistantMessage).catch(error => {
+        console.error('Failed to save assistant message:', error);
+        // Don't block chat on save failure
       });
 
       // Extract references for file highlighting (keep existing behavior)
@@ -209,6 +261,14 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
           <div className="flex flex-col gap-4">
             <div className="w-full">
               <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg mb-4 h-[calc(100vh-500px)] overflow-y-auto">
+                {loadingHistory ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500 mx-auto mb-2"></div>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm">Loading chat history...</p>
+                    </div>
+                  </div>
+                ) : (
                 {messages.map((message, index) => (
                   <div key={index} className={`mb-2 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`flex items-start ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -282,6 +342,7 @@ export default function Home({ initialShowAssistantFiles, showCitations }: HomeP
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
+                )}
               </div>
               <form onSubmit={(e) => { e.preventDefault(); handleChat(); }} className="flex mb-4">
                 <input
