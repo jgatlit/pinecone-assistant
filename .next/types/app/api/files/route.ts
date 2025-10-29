@@ -1,4 +1,4 @@
-// File: /Users/elliotbourne/Documents/SBWCCHAT/pinecone-assistant/src/app/api/files/route.ts
+// File: /home/jgatlit/projects/BourneLaw/SBWC-chatbot/pinecone-assistant/src/app/api/files/route.ts
 import * as entry from '../../../../../src/app/api/files/route.js'
 import type { NextRequest } from 'next/server.js'
 

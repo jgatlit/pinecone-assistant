@@ -1,0 +1,1 @@
+{"version":1,"functions":{"/api/embed":{"maxDuration":30},"/api/files":{"maxDuration":55},"/api/documents":{"maxDuration":30}}}

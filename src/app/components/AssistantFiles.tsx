@@ -44,7 +44,7 @@ export default function AssistantFiles({ files, referencedFiles }: AssistantFile
               >
                 <div className={`bg-gray-100 dark:bg-gray-700 p-4 rounded-lg ${isReferenced(file) ? 'border-2 border-blue-500 dark:border-blue-400' : ''}`}>
                   <h3 className="font-semibold truncate text-gray-800 dark:text-gray-200">{file.name}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Size: {formatFileSize(file.size)}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Size: {formatFileSize(file.file_size_bytes)}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Created: {new Date(file.created_at).toLocaleDateString()}
                   </p>

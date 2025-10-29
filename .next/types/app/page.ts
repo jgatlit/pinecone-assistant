@@ -1,4 +1,4 @@
-// File: /Users/elliotbourne/Documents/SBWCCHAT/pinecone-assistant/src/app/page.tsx
+// File: /home/jgatlit/projects/BourneLaw/SBWC-chatbot/pinecone-assistant/src/app/page.tsx
 import * as entry from '../../../src/app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
